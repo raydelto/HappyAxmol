@@ -27,7 +27,7 @@
 
 #include "axmol/axmol.h"
 
-class MainScene : public ax::Scene
+class MainScene : public ax::Node
 {
     enum class GameState
     {
@@ -42,8 +42,7 @@ class MainScene : public ax::Scene
 public:
     static ax::Scene* createScene();
     bool init() override;
-    void onEnter() override;  // Initialize physics when scene becomes active
-    void initPhysicsObjects();  // Initialize physics bodies after scene is set up
+    void onEnter() override;
     void update(float delta) override;
 
     // touch
@@ -73,11 +72,10 @@ private:
     ax::EventListenerKeyboard* _keyboardListener    = nullptr;
     ax::EventListenerMouse* _mouseListener          = nullptr;
     int _sceneID                                    = 0;
-    ax::Scene* _physicsScene                        = nullptr;
-    ax::PhysicsWorld* _physicsWorld                 = nullptr;
+    ax::Director* _director                         = nullptr;
+    bool _physicsInitialized                        = false;
 
 	ax::Size _visibleSize;
-    ax::Sprite* _sprBomb;
     ax::Sprite* _sprPlayer;
     ax::Vector<ax::Sprite*> _bombs;
     ax::MenuItemImage* _muteItem;

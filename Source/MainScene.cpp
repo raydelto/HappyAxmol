@@ -39,11 +39,7 @@ ax::Scene* MainScene::createScene()
     physicsWorld->setGravity(ax::Vec2(0, 0));
     
     auto layer = utils::createInstance<MainScene>();
-    layer->_physicsScene = scene;  // Store reference to physics scene
-    layer->_physicsWorld = physicsWorld;  // Store reference to physics world
     scene->addChild(layer);
-    
-    // Physics objects will be initialized in onEnter() when scene becomes running
     
     return scene;
 }
@@ -62,7 +58,7 @@ bool MainScene::init()
 {
     //////////////////////////////
     // 1. super init first
-    if (!Scene::init())
+    if (!Node::init())
     {
         return false;
     }
@@ -88,15 +84,6 @@ bool MainScene::init()
     auto menu = Menu::create(closeItem, nullptr);
     menu->setPosition(Vec2::ZERO);
     this->addChild(menu, 1);
-    
-    _sprBomb = Sprite::create("bomb.png");
-    if (!_sprBomb)
-    {
-        problemLoading("bomb.png");
-        return false;
-    }
-    _sprBomb->setPosition(_visibleSize.width / 2, _visibleSize.height + _sprBomb->getContentSize().height / 2);
-    this->addChild(_sprBomb, 1);
     
     auto bg = Sprite::create("background.png");
     if (!bg)
@@ -126,7 +113,7 @@ bool MainScene::init()
     auto animate   = Animate::create(animation);
     _sprPlayer->runAction(RepeatForever::create(animate));
 
-    // Physics bodies will be set up in initPhysicsObjects() after scene hierarchy is complete
+    // Physics will be initialized in onEnter() when node is part of physics scene
     initTouch();
     initAccelerometer();
     initBackButtonListener();
@@ -134,7 +121,7 @@ bool MainScene::init()
     schedule(AX_SCHEDULE_SELECTOR(MainScene::addBombs), 8.0f);
     initAudioNewEngine();
     initMuteButton();
-    _bombs.pushBack(_sprBomb);
+    //_bombs.pushBack(_sprBomb);
 
     // scheduleUpdate() is required to ensure update(float) is called on every loop
     scheduleUpdate();
@@ -144,29 +131,14 @@ bool MainScene::init()
 
 void MainScene::onEnter()
 {
-    Scene::onEnter();
+    Node::onEnter();
     
-    // Now the scene is running, we can initialize physics objects
-    initPhysicsObjects();
-}
-
-void MainScene::initPhysicsObjects()
-{
-    // Now we're part of the physics scene, so we can safely create physics bodies
-    setPhysicsBody(_sprPlayer);
-    setPhysicsBody(_sprBomb);
-    
-    initPhysics();
-    
-    // Verify bomb physics body was created successfully
-    auto bombBody = _sprBomb->getPhysicsBody();
-    if (bombBody)
+    // Only initialize physics once
+    if (!_physicsInitialized)
     {
-        bombBody->setVelocity(ax::Vec2(0, -100));
-    }
-    else
-    {
-        AXLOGD("Warning: Failed to create physics body for initial bomb");
+        setPhysicsBody(_sprPlayer);
+        initPhysics();
+        _physicsInitialized = true;
     }
 }
 
@@ -267,43 +239,12 @@ bool MainScene::onCollision(PhysicsContact& contact)
 
     UserDefault::getInstance()->setIntegerForKey("score", _score);
     _director->replaceScene(TransitionFlipX::create(1.0, GameOver::createScene()));
-    auto body = _sprBomb->getPhysicsBody();
-    body->setVelocity(ax::Vec2());
-    body->applyTorque(100900.5f);
     return false;
 }
 
 void MainScene::setPhysicsBody(ax::Sprite* sprite)
 {
-    // Verify sprite exists
-    if (!sprite)
-    {
-        AXLOGD("Cannot create physics body: sprite is null");
-        return;
-    }
-    
-    // Debug: Check what we have access to
-    auto director = Director::getInstance();
-    auto runningScene = director ? director->getRunningScene() : nullptr;
-    auto physicsWorld = runningScene ? runningScene->getPhysicsWorld() : nullptr;
-    
-    AXLOGD("setPhysicsBody: director={}, runningScene={}, physicsWorld={}, _physicsScene={}",
-           (void*)director, (void*)runningScene, (void*)physicsWorld, (void*)_physicsScene);
-    
-    // Verify we have access to physics world through running scene
-    if (!physicsWorld)
-    {
-        AXLOGD("Cannot create physics body: no physics world accessible from running scene");
-        return;
-    }
-    
     auto body = PhysicsBody::createCircle(sprite->getContentSize().width / 2);
-    if (!body)
-    {
-        AXLOGD("PhysicsBody::createCircle returned null");
-        return;
-    }
-    
     body->setContactTestBitmask(true);
     body->setDynamic(true);
     sprite->setPhysicsBody(body);
@@ -316,33 +257,14 @@ void MainScene::updateScore(float dt)
 
 void MainScene::addBombs(float dt)
 {
-    Sprite* bomb = nullptr;
     for (int i = 0; i < 3; i++)
     {
-        bomb = Sprite::create("bomb.png");
-        if (!bomb)
-        {
-            continue;  // Skip if sprite creation failed
-        }
+        auto bomb = Sprite::create("bomb.png");
+        setPhysicsBody(bomb);
         bomb->setPosition(AXRANDOM_0_1() * _visibleSize.width, _visibleSize.height + bomb->getContentSize().height / 2);
-        
-        // Add to this MainScene (which is child of physics scene)
         this->addChild(bomb, 1);
-        
-        setPhysicsBody(bomb);      // Then create physics body
-        
-        // Verify physics body was created before using it
-        auto physicsBody = bomb->getPhysicsBody();
-        if (physicsBody)
-        {
-            physicsBody->setVelocity(ax::Vec2(0, ((AXRANDOM_0_1() + 0.2f) * -250)));
-            _bombs.pushBack(bomb);
-        }
-        else
-        {
-            AXLOGD("Failed to create physics body for bomb");
-            this->removeChild(bomb);  // Clean up if physics body creation failed
-        }
+        bomb->getPhysicsBody()->setVelocity(ax::Vec2(0, ((AXRANDOM_0_1() + 0.2f) * -250)));
+        _bombs.pushBack(bomb);
     }
 }
 
