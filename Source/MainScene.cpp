@@ -24,10 +24,29 @@
  ****************************************************************************/
 
 #include "MainScene.h"
+#include "GameOverScene.h"
+#include "PauseScene.h"
+#include "axmol/audio/AudioEngine.h"
 
 using namespace ax;
 
 static int s_sceneID = 1000;
+
+ax::Scene* MainScene::createScene()
+{
+    auto scene = Scene::createWithPhysics();
+    auto physicsWorld = scene->getPhysicsWorld();
+    physicsWorld->setGravity(ax::Vec2(0, 0));
+    
+    auto layer = utils::createInstance<MainScene>();
+    layer->_physicsScene = scene;  // Store reference to physics scene
+    layer->_physicsWorld = physicsWorld;  // Store reference to physics world
+    scene->addChild(layer);
+    
+    // Physics objects will be initialized in onEnter() when scene becomes running
+    
+    return scene;
+}
 
 // Print useful error message instead of segfaulting when files are not there.
 static void problemLoading(const char* filename)
@@ -48,93 +67,74 @@ bool MainScene::init()
         return false;
     }
 
-    auto visibleSize = _director->getVisibleSize();
-    auto origin      = _director->getVisibleOrigin();
+    _score       = 0;
+    _director    = Director::getInstance();
+    _visibleSize = _director->getVisibleSize();
+    auto origin  = _director->getVisibleOrigin();
     auto safeArea    = _director->getSafeAreaRect();
     auto safeOrigin  = safeArea.origin;
 
-    /////////////////////////////
-    // 2. add a menu item with "X" image, which is clicked to quit the program
-    //    you may modify it.
-
-    // add a "close" icon to exit the progress. it's an autorelease object
-    auto closeItem = MenuItemImage::create("CloseNormal.png", "CloseSelected.png",
-                                           AX_CALLBACK_1(MainScene::menuCloseCallback, this));
-
-    if (closeItem == nullptr || closeItem->getContentSize().width <= 0 || closeItem->getContentSize().height <= 0)
+    auto closeItem = ax::MenuItemImage::create("pause.png", "pause_pressed.png",
+                                               AX_CALLBACK_1(MainScene::pauseCallback, this));
+    if (!closeItem)
     {
-        problemLoading("'CloseNormal.png' and 'CloseSelected.png'");
-    }
-    else
-    {
-        float x = safeOrigin.x + safeArea.size.width - closeItem->getContentSize().width / 2;
-        float y = safeOrigin.y + closeItem->getContentSize().height / 2;
-        closeItem->setPosition(Vec2(x, y));
+        problemLoading("pause.png");
+        return false;
     }
 
-    // create menu, it's an autorelease object
-    auto menu = Menu::create(closeItem, NULL);
+    closeItem->setPosition(
+        Vec2(_visibleSize.width - closeItem->getContentSize().width / 2, closeItem->getContentSize().height / 2));
+
+    auto menu = Menu::create(closeItem, nullptr);
     menu->setPosition(Vec2::ZERO);
     this->addChild(menu, 1);
-
-    /////////////////////////////
-    // 3. add your codes below...
-
-    // Some templates (uncomment what you  need)
-    _touchListener                 = EventListenerTouchAllAtOnce::create();
-    _touchListener->onTouchesBegan = AX_CALLBACK_2(MainScene::onTouchesBegan, this);
-    _touchListener->onTouchesMoved = AX_CALLBACK_2(MainScene::onTouchesMoved, this);
-    _touchListener->onTouchesEnded = AX_CALLBACK_2(MainScene::onTouchesEnded, this);
-    _eventDispatcher->addEventListenerWithSceneGraphPriority(_touchListener, this);
-
-    //_mouseListener                = EventListenerMouse::create();
-    //_mouseListener->onMouseMove   = AX_CALLBACK_1(MainScene::onMouseMove, this);
-    //_mouseListener->onMouseUp     = AX_CALLBACK_1(MainScene::onMouseUp, this);
-    //_mouseListener->onMouseDown   = AX_CALLBACK_1(MainScene::onMouseDown, this);
-    //_mouseListener->onMouseScroll = AX_CALLBACK_1(MainScene::onMouseScroll, this);
-    //_eventDispatcher->addEventListenerWithSceneGraphPriority(_mouseListener, this);
-
-    _keyboardListener                = EventListenerKeyboard::create();
-    _keyboardListener->onKeyPressed  = AX_CALLBACK_2(MainScene::onKeyPressed, this);
-    _keyboardListener->onKeyReleased = AX_CALLBACK_2(MainScene::onKeyReleased, this);
-    _eventDispatcher->addEventListenerWithFixedPriority(_keyboardListener, 11);
-
-    // add a label shows "Hello World"
-    // create and initialize a label
-
-    auto label = Label::createWithTTF("Hello World", "fonts/Marker Felt.ttf", 24);
-    if (label == nullptr)
+    
+    _sprBomb = Sprite::create("bomb.png");
+    if (!_sprBomb)
     {
-        problemLoading("'fonts/Marker Felt.ttf'");
+        problemLoading("bomb.png");
+        return false;
     }
-    else
+    _sprBomb->setPosition(_visibleSize.width / 2, _visibleSize.height + _sprBomb->getContentSize().height / 2);
+    this->addChild(_sprBomb, 1);
+    
+    auto bg = Sprite::create("background.png");
+    if (!bg)
     {
-        // position the label on the center of the screen
-        label->setPosition(
-            Vec2(origin.x + visibleSize.width / 2, origin.y + visibleSize.height - label->getContentSize().height));
-
-        // add the label as a child to this layer
-        this->addChild(label, 1);
+        problemLoading("background.png");
+        return false;
     }
-    // add "HelloWorld" splash screen"
-    auto sprite = Sprite::create("HelloWorld.png"sv);
-    if (sprite == nullptr)
+    bg->setAnchorPoint(Vec2());
+    bg->setPosition(0, 0);
+    this->addChild(bg, -1);
+    
+    _sprPlayer = Sprite::create("player.png");
+    if (!_sprPlayer)
     {
-        problemLoading("'HelloWorld.png'");
+        problemLoading("player.png");
+        return false;
     }
-    else
-    {
-        // position the sprite on the center of the screen
-        sprite->setPosition(Vec2(visibleSize.width / 2 + origin.x, visibleSize.height / 2 + origin.y));
+    _sprPlayer->setPosition(_visibleSize.width / 2, _visibleSize.height * 0.23);
+    this->addChild(_sprPlayer, 0);
+    
+    // Animations
+    Vector<SpriteFrame*> frames;
+    Size playerSize = _sprPlayer->getContentSize();
+    frames.pushBack(SpriteFrame::create("player.png", Rect(0, 0, playerSize.width, playerSize.height)));
+    frames.pushBack(SpriteFrame::create("player2.png", Rect(0, 0, playerSize.width, playerSize.height)));
+    auto animation = Animation::createWithSpriteFrames(frames, 0.2f);
+    auto animate   = Animate::create(animation);
+    _sprPlayer->runAction(RepeatForever::create(animate));
 
-        // add the sprite as a child to this layer
-        this->addChild(sprite, 0);
-        auto drawNode = DrawNode::create();
-        drawNode->setPosition(Vec2(0, 0));
-        addChild(drawNode);
-
-        drawNode->drawRect(safeArea.origin + Vec2(1, 1), safeArea.origin + safeArea.size, Color::BLUE);
-    }
+    // Physics bodies will be set up in initPhysicsObjects() after scene hierarchy is complete
+    initTouch();
+    initAccelerometer();
+    initBackButtonListener();
+    schedule(AX_SCHEDULE_SELECTOR(MainScene::updateScore), 3.0f);
+    schedule(AX_SCHEDULE_SELECTOR(MainScene::addBombs), 8.0f);
+    initAudioNewEngine();
+    initMuteButton();
+    _bombs.pushBack(_sprBomb);
 
     // scheduleUpdate() is required to ensure update(float) is called on every loop
     scheduleUpdate();
@@ -142,66 +142,303 @@ bool MainScene::init()
     return true;
 }
 
-void MainScene::onTouchesBegan(const std::vector<ax::Touch*>& touches, ax::Event* event)
+void MainScene::onEnter()
 {
-    for (auto&& t : touches)
+    Scene::onEnter();
+    
+    // Now the scene is running, we can initialize physics objects
+    initPhysicsObjects();
+}
+
+void MainScene::initPhysicsObjects()
+{
+    // Now we're part of the physics scene, so we can safely create physics bodies
+    setPhysicsBody(_sprPlayer);
+    setPhysicsBody(_sprBomb);
+    
+    initPhysics();
+    
+    // Verify bomb physics body was created successfully
+    auto bombBody = _sprBomb->getPhysicsBody();
+    if (bombBody)
     {
-        // AXLOGD("onTouchesBegan detected, X:{}  Y:{}", t->getLocation().x, t->getLocation().y);
+        bombBody->setVelocity(ax::Vec2(0, -100));
+    }
+    else
+    {
+        AXLOGD("Warning: Failed to create physics body for initial bomb");
     }
 }
 
-void MainScene::onTouchesMoved(const std::vector<ax::Touch*>& touches, ax::Event* event)
+// Move the player if it does not go outside of the screen
+void MainScene::movePlayerIfPossible(float newX)
 {
-    for (auto&& t : touches)
+    float sprHalfWidth = _sprPlayer->getBoundingBox().size.width / 2;
+    if (newX >= sprHalfWidth && newX < _visibleSize.width - sprHalfWidth)
     {
-        // AXLOGD("onTouchesMoved detected, X:{}  Y:{}", t->getLocation().x, t->getLocation().y);
+        _sprPlayer->setPositionX(newX);
     }
 }
 
-void MainScene::onTouchesEnded(const std::vector<ax::Touch*>& touches, ax::Event* event)
+void MainScene::movePlayerByTouch(Touch* touch, Event* event)
 {
-    for (auto&& t : touches)
+    Vec2 touchLocation = touch->getLocation();
+    if (_sprPlayer->getBoundingBox().containsPoint(touchLocation))
     {
-        // AXLOGD("onTouchesEnded detected, X:{}  Y:{}", t->getLocation().x, t->getLocation().y);
+        movePlayerIfPossible(touchLocation.x);
     }
 }
 
-bool MainScene::onMouseDown(Event* event)
+bool MainScene::explodeBombs(ax::Touch* touch, ax::Event* event)
 {
-    EventMouse* e = static_cast<EventMouse*>(event);
-    // AXLOGD("onMouseDown detected, button: {}", static_cast<int>(e->getMouseButton()));
+    Vec2 touchLocation = touch->getLocation();
+    ax::Vector<ax::Sprite*> toErase;
+
+    for (auto bomb : _bombs)
+    {
+        if (bomb->getBoundingBox().containsPoint(touchLocation))
+        {
+            ax::AudioEngine::play2d("bomb.mp3");
+            auto explosion = ParticleExplosion::create();
+            // auto explosion = ParticleSystemQuad::create("explosion.plist");
+            explosion->setPosition(bomb->getPosition());
+            this->addChild(explosion);
+            /*explosion->setTotalParticles(800);
+            explosion->setSpeed(3.5f);
+            explosion->setLife(300.0f);	*/
+            bomb->setVisible(false);
+            this->removeChild(bomb);
+            toErase.pushBack(bomb);
+        }
+    }
+
+    for (auto bomb : toErase)
+    {
+        _bombs.eraseObject(bomb);
+    }
+
     return true;
 }
 
-bool MainScene::onMouseUp(Event* event)
+void MainScene::initTouch()
 {
-    EventMouse* e = static_cast<EventMouse*>(event);
-    AXLOGD("onMouseUp detected, button: {}", static_cast<int>(e->getMouseButton()));
-    return true;
+    auto listener          = EventListenerTouchOneByOne::create();
+    listener->onTouchBegan = AX_CALLBACK_2(MainScene::explodeBombs, this);
+    listener->onTouchMoved = AX_CALLBACK_2(MainScene::movePlayerByTouch, this);
+    listener->onTouchEnded = [=](Touch* touch, Event* event) {};
+    _eventDispatcher->addEventListenerWithSceneGraphPriority(listener, this);
 }
 
-bool MainScene::onMouseMove(Event* event)
+void MainScene::initAccelerometer()
 {
-    EventMouse* e = static_cast<EventMouse*>(event);
-    // AXLOGD("onMouseMove detected, X:{}  Y:{}", e->getLocation().x, e->getLocation().y);
-    return true;
+    Device::setAccelerometerEnabled(true);
+    auto listener = EventListenerAcceleration::create(AX_CALLBACK_2(MainScene::movePlayerByAccelerometer, this));
+    _eventDispatcher->addEventListenerWithSceneGraphPriority(listener, this);
 }
 
-bool MainScene::onMouseScroll(Event* event)
+void MainScene::movePlayerByAccelerometer(ax::Acceleration* acceleration, ax::Event* event)
 {
-    EventMouse* e = static_cast<EventMouse*>(event);
-    // AXLOGD("onMouseScroll detected, X:{}  Y:{}", e->getScrollX(), e->getScrollY());
-    return true;
+    movePlayerIfPossible(_sprPlayer->getPositionX() + (acceleration->x * 10));
 }
 
-void MainScene::onKeyPressed(EventKeyboard::KeyCode code, Event* event)
+bool MainScene::onCollision(PhysicsContact& contact)
 {
-    AXLOGD("Scene: #{} onKeyPressed, keycode: {}", _sceneID, static_cast<int>(code));
+    AXLOGD("Collision detected");
+    auto playerBody = _sprPlayer->getPhysicsBody();
+    auto shapeA = contact.getShapeA();
+    auto shapeB = contact.getShapeB();
+    
+    // Check if player is involved in the collision
+    if (shapeA->getBody() != playerBody && shapeB->getBody() != playerBody)
+    {
+        return false;
+    }
+
+    if (_muteItem->isVisible())
+    {
+        // CocosDenshion
+        /*SimpleAudioEngine::getInstance()->stopBackgroundMusic();
+        SimpleAudioEngine::getInstance()->playEffect("uh.wav");*/
+
+        // New audio engine
+        AudioEngine::stopAll();
+        AudioEngine::play2d("uh.mp3");
+    }
+
+    UserDefault::getInstance()->setIntegerForKey("score", _score);
+    _director->replaceScene(TransitionFlipX::create(1.0, GameOver::createScene()));
+    auto body = _sprBomb->getPhysicsBody();
+    body->setVelocity(ax::Vec2());
+    body->applyTorque(100900.5f);
+    return false;
 }
 
-void MainScene::onKeyReleased(EventKeyboard::KeyCode code, Event* event)
+void MainScene::setPhysicsBody(ax::Sprite* sprite)
 {
-    AXLOGD("onKeyReleased, keycode: {}", static_cast<int>(code));
+    // Verify sprite exists
+    if (!sprite)
+    {
+        AXLOGD("Cannot create physics body: sprite is null");
+        return;
+    }
+    
+    // Debug: Check what we have access to
+    auto director = Director::getInstance();
+    auto runningScene = director ? director->getRunningScene() : nullptr;
+    auto physicsWorld = runningScene ? runningScene->getPhysicsWorld() : nullptr;
+    
+    AXLOGD("setPhysicsBody: director={}, runningScene={}, physicsWorld={}, _physicsScene={}",
+           (void*)director, (void*)runningScene, (void*)physicsWorld, (void*)_physicsScene);
+    
+    // Verify we have access to physics world through running scene
+    if (!physicsWorld)
+    {
+        AXLOGD("Cannot create physics body: no physics world accessible from running scene");
+        return;
+    }
+    
+    auto body = PhysicsBody::createCircle(sprite->getContentSize().width / 2);
+    if (!body)
+    {
+        AXLOGD("PhysicsBody::createCircle returned null");
+        return;
+    }
+    
+    body->setContactTestBitmask(true);
+    body->setDynamic(true);
+    sprite->setPhysicsBody(body);
+}
+
+void MainScene::updateScore(float dt)
+{
+    _score += 10;
+}
+
+void MainScene::addBombs(float dt)
+{
+    Sprite* bomb = nullptr;
+    for (int i = 0; i < 3; i++)
+    {
+        bomb = Sprite::create("bomb.png");
+        if (!bomb)
+        {
+            continue;  // Skip if sprite creation failed
+        }
+        bomb->setPosition(AXRANDOM_0_1() * _visibleSize.width, _visibleSize.height + bomb->getContentSize().height / 2);
+        
+        // Add to this MainScene (which is child of physics scene)
+        this->addChild(bomb, 1);
+        
+        setPhysicsBody(bomb);      // Then create physics body
+        
+        // Verify physics body was created before using it
+        auto physicsBody = bomb->getPhysicsBody();
+        if (physicsBody)
+        {
+            physicsBody->setVelocity(ax::Vec2(0, ((AXRANDOM_0_1() + 0.2f) * -250)));
+            _bombs.pushBack(bomb);
+        }
+        else
+        {
+            AXLOGD("Failed to create physics body for bomb");
+            this->removeChild(bomb);  // Clean up if physics body creation failed
+        }
+    }
+}
+
+void MainScene::initAudioNewEngine()
+{
+    if (AudioEngine::lazyInit())
+    {
+        _musicId = AudioEngine::play2d("music.mp3");
+        AudioEngine::setVolume(_musicId, 1);
+        AudioEngine::setLoop(_musicId, true);
+        AXLOGD("Audio initialized successfully");
+    }
+    else
+    {
+        AXLOGD("Error while initializing new audio engine");
+    }
+}
+
+void MainScene::initAudio()
+{
+    int musicHandler = ax::AudioEngine::play2d("music.mp3", true);
+    ax::AudioEngine::preload("uh.wav");
+
+    ax::AudioEngine::setVolume(musicHandler, 1.0f);
+}
+
+void MainScene::initPhysics()
+{
+    auto contactListener            = EventListenerPhysicsContact::create();
+    contactListener->onContactBegin = AX_CALLBACK_1(MainScene::onCollision, this);
+    getEventDispatcher()->addEventListenerWithSceneGraphPriority(contactListener, this);
+}
+
+void MainScene::initMuteButton()
+{
+    _muteItem = MenuItemImage::create("mute.png", "mute.png", AX_CALLBACK_1(MainScene::muteCallback, this));
+
+    _muteItem->setPosition(Vec2(_visibleSize.width - _muteItem->getContentSize().width / 2,
+                                _visibleSize.height - _muteItem->getContentSize().height * 2));
+
+    _unmuteItem = MenuItemImage::create("unmute.png", "unmute.png", AX_CALLBACK_1(MainScene::muteCallback, this));
+
+    _unmuteItem->setPosition(Vec2(_visibleSize.width - _unmuteItem->getContentSize().width / 2,
+                                  _visibleSize.height - _unmuteItem->getContentSize().height * 2));
+    _unmuteItem->setVisible(false);
+
+    auto menu = Menu::create(_muteItem, _unmuteItem, nullptr);
+    menu->setPosition(Vec2::ZERO);
+    this->addChild(menu, 2);
+}
+
+void MainScene::muteCallback(ax::Object* pSender)
+{
+    if (_muteItem->isVisible())
+    {
+        // CocosDenshion
+        // SimpleAudioEngine::getInstance()->setBackgroundMusicVolume(0);
+        AudioEngine::setVolume(_musicId, 0);
+    }
+    else
+    {
+        // SimpleAudioEngine::getInstance()->setBackgroundMusicVolume(1);
+        AudioEngine::setVolume(_musicId, 1);
+    }
+
+    _muteItem->setVisible(!_muteItem->isVisible());
+    _unmuteItem->setVisible(!_muteItem->isVisible());
+}
+
+
+
+void MainScene::pauseCallback(ax::Object* pSender)
+{
+    _director->pushScene(TransitionFlipX::create(1.0, Pause::createScene()));
+}
+
+void MainScene::initBackButtonListener()
+{
+    auto listener           = EventListenerKeyboard::create();
+    listener->onKeyPressed  = [=](EventKeyboard::KeyCode keyCode, Event* event) {};
+    listener->onKeyReleased = AX_CALLBACK_2(MainScene::onKeyPressed, this);
+    _eventDispatcher->addEventListenerWithSceneGraphPriority(listener, this);
+}
+
+void MainScene::onKeyPressed(EventKeyboard::KeyCode keyCode, Event* event)
+{
+    if (keyCode == EventKeyboard::KeyCode::KEY_BACK)
+    {
+        Director::getInstance()->end();
+    }
+}
+
+void MainScene::menuCloseCallback(ax::Object* sender)
+{
+    // Close the cocos2d-x game scene and quit the application
+    Director::getInstance()->end();
 }
 
 void MainScene::update(float delta)
@@ -264,18 +501,7 @@ void MainScene::update(float delta)
     }  // switch
 }
 
-void MainScene::menuCloseCallback(ax::Object* sender)
-{
-    // Close the axmol game scene and quit the application
-    _director->end();
 
-    /*To navigate back to native iOS screen(if present) without quitting the application  ,do not use
-     * _director->end() as given above,instead trigger a custom event created in RootViewController.mm
-     * as below*/
-
-    // EventCustom customEndEvent("game_scene_close_event");
-    //_eventDispatcher->dispatchEvent(&customEndEvent);
-}
 
 MainScene::MainScene()
 {

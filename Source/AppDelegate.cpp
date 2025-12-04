@@ -89,6 +89,34 @@ bool AppDelegate::applicationDidFinishLaunching()
     renderView->setVR(std::move(vrRenderer));
 #endif
 
+    auto glview     = director->getRenderView();
+    Size screenSize = glview->getFrameSize();
+    Size designSize(768, 1280);
+    std::vector<std::string> searchPaths;
+    searchPaths.push_back("sounds");
+    searchPaths.push_back("particles");
+
+    if (screenSize.height > 800)
+    {
+        // High Resolution
+        searchPaths.push_back("images/high");
+        director->setContentScaleFactor(1280.0f / designSize.height);
+    }
+    else if (screenSize.height > 600)
+    {
+        // Mid resolution
+        searchPaths.push_back("images/mid");
+        director->setContentScaleFactor(800.0f / designSize.height);
+    }
+    else
+    {
+        // Low resolution
+        searchPaths.push_back("images/low");
+        director->setContentScaleFactor(320.0f / designSize.height);
+    }
+    FileUtils::getInstance()->setSearchPaths(searchPaths);
+    glview->setDesignResolutionSize(designSize.width, designSize.height, ResolutionPolicy::EXACT_FIT);
+
     // turn on display FPS
     director->setStatsDisplay(true);
 
@@ -100,7 +128,7 @@ bool AppDelegate::applicationDidFinishLaunching()
                                         ResolutionPolicy::SHOW_ALL);
 
     // create a scene. it's an autorelease object
-    auto scene = utils::createInstance<MainScene>();
+    auto scene = MainScene::createScene();
 
     // run
     director->runWithScene(scene);

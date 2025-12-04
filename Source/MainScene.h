@@ -40,7 +40,10 @@ class MainScene : public ax::Scene
     };
 
 public:
+    static ax::Scene* createScene();
     bool init() override;
+    void onEnter() override;  // Initialize physics when scene becomes active
+    void initPhysicsObjects();  // Initialize physics bodies after scene is set up
     void update(float delta) override;
 
     // touch
@@ -70,4 +73,32 @@ private:
     ax::EventListenerKeyboard* _keyboardListener    = nullptr;
     ax::EventListenerMouse* _mouseListener          = nullptr;
     int _sceneID                                    = 0;
+    ax::Scene* _physicsScene                        = nullptr;
+    ax::PhysicsWorld* _physicsWorld                 = nullptr;
+
+	ax::Size _visibleSize;
+    ax::Sprite* _sprBomb;
+    ax::Sprite* _sprPlayer;
+    ax::Vector<ax::Sprite*> _bombs;
+    ax::MenuItemImage* _muteItem;
+    ax::MenuItemImage* _unmuteItem;
+    int _score;
+    int _musicId;
+    void initPhysics();
+    void pauseCallback(ax::Object* pSender);
+    void muteCallback(ax::Object* pSender);
+    bool onCollision(ax::PhysicsContact& contact);
+    void setPhysicsBody(ax::Sprite* sprite);
+    void initTouch();
+    void movePlayerByTouch(ax::Touch* touch, ax::Event* event);
+    bool explodeBombs(ax::Touch* touch, ax::Event* event);
+    void movePlayerIfPossible(float newX);
+    void movePlayerByAccelerometer(ax::Acceleration* acceleration, ax::Event* event);
+    void initAccelerometer();
+    void initBackButtonListener();
+    void updateScore(float dt);
+    void addBombs(float dt);
+    void initAudio();
+    void initAudioNewEngine();
+    void initMuteButton();
 };
