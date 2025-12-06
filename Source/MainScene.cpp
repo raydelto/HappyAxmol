@@ -9,7 +9,7 @@ static int s_sceneID = 1000;
 
 ax::Scene* MainScene::createScene()
 {
-    auto scene        = Scene::create();
+    auto scene = Scene::create();
     auto layer = utils::createInstance<MainScene>();
     scene->addChild(layer);
 
@@ -35,25 +35,22 @@ bool MainScene::init()
         return false;
     }
 
-    _score          = 0;
-    _director       = Director::getInstance();
-    _visibleSize    = _director->getVisibleSize();
-    auto origin     = _director->getVisibleOrigin();
-    auto safeArea   = _director->getSafeAreaRect();
-    auto safeOrigin = safeArea.origin;
+    _score       = 0;
+    _director    = Director::getInstance();
+    _visibleSize = _director->getVisibleSize();
 
-    auto closeItem =
+    auto pauseItem =
         ax::MenuItemImage::create("pause.png", "pause_pressed.png", AX_CALLBACK_1(MainScene::pauseCallback, this));
-    if (!closeItem)
+    if (!pauseItem)
     {
         problemLoading("pause.png");
         return false;
     }
 
-    closeItem->setPosition(
-        Vec2(_visibleSize.width - closeItem->getContentSize().width / 2, closeItem->getContentSize().height / 2));
+    pauseItem->setPosition(
+        Vec2(_visibleSize.width - pauseItem->getContentSize().width / 2, pauseItem->getContentSize().height / 2));
 
-    auto menu = Menu::create(closeItem, nullptr);
+    auto menu = Menu::create(pauseItem, nullptr);
     menu->setPosition(Vec2::ZERO);
     this->addChild(menu, 1);
 
@@ -85,7 +82,6 @@ bool MainScene::init()
     auto animate   = Animate::create(animation);
     _sprPlayer->runAction(RepeatForever::create(animate));
 
-    // Physics will be initialized in onEnter() when node is part of physics scene
     initTouch();
     initAccelerometer();
     initBackButtonListener();
@@ -94,8 +90,6 @@ bool MainScene::init()
     addBombs(0.0f);
     initAudioNewEngine();
     initMuteButton();
-
-    // scheduleUpdate() is required to ensure update(float) is called on every loop
     scheduleUpdate();
 
     return true;
@@ -136,12 +130,8 @@ bool MainScene::explodeBombs(ax::Touch* touch, ax::Event* event)
         {
             ax::AudioEngine::play2d("bomb.mp3");
             auto explosion = ParticleExplosion::create();
-            // auto explosion = ParticleSystemQuad::create("explosion.plist");
             explosion->setPosition(bomb->getPosition());
             this->addChild(explosion);
-            /*explosion->setTotalParticles(800);
-            explosion->setSpeed(3.5f);
-            explosion->setLife(300.0f);	*/
             bomb->setVisible(false);
             this->removeChild(bomb);
             toErase.pushBack(bomb);
@@ -179,18 +169,14 @@ void MainScene::movePlayerByAccelerometer(ax::Acceleration* acceleration, ax::Ev
 
 void MainScene::onCollision()
 {
-    AXLOGD("Collision detected");
+    _gameState = GameState::pause;
 
     if (_muteItem->isVisible())
     {
-        // New audio engine
-        AXLOGD("Playing uh.mp3 sound");
         AudioEngine::stopAll();
         AudioEngine::play2d("uh.mp3");
-
     }
 
-    AXLOGD("Game Over! Your score: %d", _score);
     UserDefault::getInstance()->setIntegerForKey("score", _score);
     _director->replaceScene(TransitionFlipX::create(1.0, GameOver::createScene()));
 }
@@ -202,10 +188,12 @@ void MainScene::updateScore(float dt)
 
 void MainScene::addBombs(float dt)
 {
-    AXLOGD("Adding bombs");
     for (int i = 0; i < 3; i++)
     {
-        auto bomb = Sprite::create("bomb.png");
+        auto bomb    = Sprite::create("bomb.png");
+        float* speed = new float;
+        *speed       = ax::random(1.0f, 5.5f);
+        bomb->setUserData(static_cast<void*>(speed));
         bomb->setPosition(AXRANDOM_0_1() * _visibleSize.width, _visibleSize.height + bomb->getContentSize().height / 2);
         this->addChild(bomb, 1);
         _bombs.pushBack(bomb);
@@ -257,7 +245,7 @@ void MainScene::muteCallback(ax::Object* pSender)
 
 void MainScene::pauseCallback(ax::Object* pSender)
 {
-    _director->pushScene(TransitionFlipX::create(1.0, Pause::createScene()));
+    _director->pushScene(TransitionFlipX::create(0.0, Pause::createScene()));
 }
 
 void MainScene::initBackButtonListener()
@@ -290,23 +278,31 @@ void MainScene::update(float delta)
         break;
 
     case GameState::update:
+    {
+        constexpr float BOMB_SPEED = 5.0f;
+        ax::Vector<ax::Sprite*> toErase;
+
         for (auto bomb : _bombs)
         {
-            bomb->setPositionY(bomb->getPositionY() - 5);
+            bomb->setPositionY(bomb->getPositionY() - (BOMB_SPEED + static_cast<float*>(bomb->getUserData())[0]));
             if (bomb->getBoundingBox().intersectsRect(_sprPlayer->getBoundingBox()))
             {
                 onCollision();
             }
             if (bomb->getPositionY() < -bomb->getContentSize().height / 2)
             {
+                toErase.pushBack(bomb);
                 this->removeChild(bomb);
             }
         }
-        break;
 
-    case GameState::end:
-        menuCloseCallback(this);
+        for (auto bomb : toErase)
+        {
+            _bombs.eraseObject(bomb);
+        }
+
         break;
+    }
     }
 }
 
