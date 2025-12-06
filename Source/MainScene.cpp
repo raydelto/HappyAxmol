@@ -1,28 +1,3 @@
-/****************************************************************************
- Copyright (c) 2017-2018 Xiamen Yaji Software Co., Ltd.
- Copyright (c) 2019-present Axmol Engine contributors (see AUTHORS.md).
-
- https://axmol.dev/
-
- Permission is hereby granted, free of charge, to any person obtaining a copy
- of this software and associated documentation files (the "Software"), to deal
- in the Software without restriction, including without limitation the rights
- to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
- copies of the Software, and to permit persons to whom the Software is
- furnished to do so, subject to the following conditions:
-
- The above copyright notice and this permission notice shall be included in
- all copies or substantial portions of the Software.
-
- THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
- IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
- FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
- AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
- LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
- OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
- THE SOFTWARE.
- ****************************************************************************/
-
 #include "MainScene.h"
 #include "GameOverScene.h"
 #include "PauseScene.h"
@@ -34,13 +9,10 @@ static int s_sceneID = 1000;
 
 ax::Scene* MainScene::createScene()
 {
-    auto scene = Scene::createWithPhysics();
-    auto physicsWorld = scene->getPhysicsWorld();
-    physicsWorld->setGravity(ax::Vec2(0, 0));
-    
+    auto scene        = Scene::create();
     auto layer = utils::createInstance<MainScene>();
     scene->addChild(layer);
-    
+
     return scene;
 }
 
@@ -63,15 +35,15 @@ bool MainScene::init()
         return false;
     }
 
-    _score       = 0;
-    _director    = Director::getInstance();
-    _visibleSize = _director->getVisibleSize();
-    auto origin  = _director->getVisibleOrigin();
-    auto safeArea    = _director->getSafeAreaRect();
-    auto safeOrigin  = safeArea.origin;
+    _score          = 0;
+    _director       = Director::getInstance();
+    _visibleSize    = _director->getVisibleSize();
+    auto origin     = _director->getVisibleOrigin();
+    auto safeArea   = _director->getSafeAreaRect();
+    auto safeOrigin = safeArea.origin;
 
-    auto closeItem = ax::MenuItemImage::create("pause.png", "pause_pressed.png",
-                                               AX_CALLBACK_1(MainScene::pauseCallback, this));
+    auto closeItem =
+        ax::MenuItemImage::create("pause.png", "pause_pressed.png", AX_CALLBACK_1(MainScene::pauseCallback, this));
     if (!closeItem)
     {
         problemLoading("pause.png");
@@ -84,7 +56,7 @@ bool MainScene::init()
     auto menu = Menu::create(closeItem, nullptr);
     menu->setPosition(Vec2::ZERO);
     this->addChild(menu, 1);
-    
+
     auto bg = Sprite::create("background.png");
     if (!bg)
     {
@@ -94,7 +66,7 @@ bool MainScene::init()
     bg->setAnchorPoint(Vec2());
     bg->setPosition(0, 0);
     this->addChild(bg, -1);
-    
+
     _sprPlayer = Sprite::create("player.png");
     if (!_sprPlayer)
     {
@@ -103,7 +75,7 @@ bool MainScene::init()
     }
     _sprPlayer->setPosition(_visibleSize.width / 2, _visibleSize.height * 0.23);
     this->addChild(_sprPlayer, 0);
-    
+
     // Animations
     Vector<SpriteFrame*> frames;
     Size playerSize = _sprPlayer->getContentSize();
@@ -119,9 +91,9 @@ bool MainScene::init()
     initBackButtonListener();
     schedule(AX_SCHEDULE_SELECTOR(MainScene::updateScore), 3.0f);
     schedule(AX_SCHEDULE_SELECTOR(MainScene::addBombs), 8.0f);
+    addBombs(0.0f);
     initAudioNewEngine();
     initMuteButton();
-    //_bombs.pushBack(_sprBomb);
 
     // scheduleUpdate() is required to ensure update(float) is called on every loop
     scheduleUpdate();
@@ -132,14 +104,6 @@ bool MainScene::init()
 void MainScene::onEnter()
 {
     Node::onEnter();
-    
-    // Only initialize physics once
-    if (!_physicsInitialized)
-    {
-        setPhysicsBody(_sprPlayer);
-        initPhysics();
-        _physicsInitialized = true;
-    }
 }
 
 // Move the player if it does not go outside of the screen
@@ -213,41 +177,22 @@ void MainScene::movePlayerByAccelerometer(ax::Acceleration* acceleration, ax::Ev
     movePlayerIfPossible(_sprPlayer->getPositionX() + (acceleration->x * 10));
 }
 
-bool MainScene::onCollision(PhysicsContact& contact)
+void MainScene::onCollision()
 {
     AXLOGD("Collision detected");
-    auto playerBody = _sprPlayer->getPhysicsBody();
-    auto shapeA = contact.getShapeA();
-    auto shapeB = contact.getShapeB();
-    
-    // Check if player is involved in the collision
-    if (shapeA->getBody() != playerBody && shapeB->getBody() != playerBody)
-    {
-        return false;
-    }
 
     if (_muteItem->isVisible())
     {
-        // CocosDenshion
-        /*SimpleAudioEngine::getInstance()->stopBackgroundMusic();
-        SimpleAudioEngine::getInstance()->playEffect("uh.wav");*/
-
         // New audio engine
+        AXLOGD("Playing uh.mp3 sound");
         AudioEngine::stopAll();
         AudioEngine::play2d("uh.mp3");
+
     }
 
+    AXLOGD("Game Over! Your score: %d", _score);
     UserDefault::getInstance()->setIntegerForKey("score", _score);
     _director->replaceScene(TransitionFlipX::create(1.0, GameOver::createScene()));
-    return false;
-}
-
-void MainScene::setPhysicsBody(ax::Sprite* sprite)
-{
-    auto body = PhysicsBody::createCircle(sprite->getContentSize().width / 2);
-    body->setContactTestBitmask(true);
-    body->setDynamic(true);
-    sprite->setPhysicsBody(body);
 }
 
 void MainScene::updateScore(float dt)
@@ -257,13 +202,12 @@ void MainScene::updateScore(float dt)
 
 void MainScene::addBombs(float dt)
 {
+    AXLOGD("Adding bombs");
     for (int i = 0; i < 3; i++)
     {
         auto bomb = Sprite::create("bomb.png");
-        setPhysicsBody(bomb);
         bomb->setPosition(AXRANDOM_0_1() * _visibleSize.width, _visibleSize.height + bomb->getContentSize().height / 2);
         this->addChild(bomb, 1);
-        bomb->getPhysicsBody()->setVelocity(ax::Vec2(0, ((AXRANDOM_0_1() + 0.2f) * -250)));
         _bombs.pushBack(bomb);
     }
 }
@@ -281,21 +225,7 @@ void MainScene::initAudioNewEngine()
     {
         AXLOGD("Error while initializing new audio engine");
     }
-}
-
-void MainScene::initAudio()
-{
-    int musicHandler = ax::AudioEngine::play2d("music.mp3", true);
-    ax::AudioEngine::preload("uh.wav");
-
-    ax::AudioEngine::setVolume(musicHandler, 1.0f);
-}
-
-void MainScene::initPhysics()
-{
-    auto contactListener            = EventListenerPhysicsContact::create();
-    contactListener->onContactBegin = AX_CALLBACK_1(MainScene::onCollision, this);
-    getEventDispatcher()->addEventListenerWithSceneGraphPriority(contactListener, this);
+    AudioEngine::preload("uh.mp3");
 }
 
 void MainScene::initMuteButton()
@@ -318,23 +248,12 @@ void MainScene::initMuteButton()
 
 void MainScene::muteCallback(ax::Object* pSender)
 {
-    if (_muteItem->isVisible())
-    {
-        // CocosDenshion
-        // SimpleAudioEngine::getInstance()->setBackgroundMusicVolume(0);
-        AudioEngine::setVolume(_musicId, 0);
-    }
-    else
-    {
-        // SimpleAudioEngine::getInstance()->setBackgroundMusicVolume(1);
-        AudioEngine::setVolume(_musicId, 1);
-    }
+
+    AudioEngine::setVolume(_musicId, _unmuteItem->isVisible());
 
     _muteItem->setVisible(!_muteItem->isVisible());
     _unmuteItem->setVisible(!_muteItem->isVisible());
 }
-
-
 
 void MainScene::pauseCallback(ax::Object* pSender)
 {
@@ -359,7 +278,6 @@ void MainScene::onKeyPressed(EventKeyboard::KeyCode keyCode, Event* event)
 
 void MainScene::menuCloseCallback(ax::Object* sender)
 {
-    // Close the cocos2d-x game scene and quit the application
     Director::getInstance()->end();
 }
 
@@ -368,72 +286,37 @@ void MainScene::update(float delta)
     switch (_gameState)
     {
     case GameState::init:
-    {
         _gameState = GameState::update;
         break;
-    }
 
     case GameState::update:
-    {
-        /////////////////////////////
-        // Add your codes below...like....
-        //
-        // UpdateJoyStick();
-        // UpdatePlayer();
-        // UpdatePhysics();
-        // ...
+        for (auto bomb : _bombs)
+        {
+            bomb->setPositionY(bomb->getPositionY() - 5);
+            if (bomb->getBoundingBox().intersectsRect(_sprPlayer->getBoundingBox()))
+            {
+                onCollision();
+            }
+            if (bomb->getPositionY() < -bomb->getContentSize().height / 2)
+            {
+                this->removeChild(bomb);
+            }
+        }
         break;
-    }
-
-    case GameState::pause:
-    {
-        /////////////////////////////
-        // Add your codes below...like....
-        //
-        // anyPauseStuff()
-
-        break;
-    }
-
-    case GameState::menu1:
-    {  /////////////////////////////
-        // Add your codes below...like....
-        //
-        // UpdateMenu1();
-        break;
-    }
-
-    case GameState::menu2:
-    {  /////////////////////////////
-        // Add your codes below...like....
-        //
-        // UpdateMenu2();
-        break;
-    }
 
     case GameState::end:
-    {  /////////////////////////////
-        // Add your codes below...like....
-        //
-        // CleanUpMyCrap();
         menuCloseCallback(this);
         break;
     }
-
-    }  // switch
 }
-
-
 
 MainScene::MainScene()
 {
     _sceneID = ++s_sceneID;
-    AXLOGD("Scene: ctor: #{}", _sceneID);
 }
 
 MainScene::~MainScene()
 {
-    AXLOGD("~Scene: dtor: #{}", _sceneID);
 
     if (_touchListener)
         _eventDispatcher->removeEventListener(_touchListener);
