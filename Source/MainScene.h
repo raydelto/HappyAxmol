@@ -42,12 +42,12 @@ public:
     ~MainScene() override;
 
 private:
-    GameState _gameState                            = GameState::init;
-    ax::EventListenerTouchAllAtOnce* _touchListener = nullptr;
-    ax::EventListenerKeyboard* _keyboardListener    = nullptr;
-    ax::EventListenerMouse* _mouseListener          = nullptr;
-    int _sceneID                                    = 0;
-    ax::Director* _director                         = nullptr;
+    GameState _gameState;
+    ax::EventListenerTouchAllAtOnce* _touchListener;
+    ax::EventListenerKeyboard* _keyboardListener;
+    ax::EventListenerMouse* _mouseListener;
+    int _sceneID;
+    ax::Director* _director;
 
 	ax::Size _visibleSize;
     ax::Sprite* _sprPlayer;
