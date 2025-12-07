@@ -3,8 +3,6 @@
 #include "PauseScene.h"
 #include "axmol/audio/AudioEngine.h"
 
-static int s_sceneID = 1000;
-
 ax::Scene* MainScene::createScene()
 {
     auto scene = ax::Scene::create();
@@ -305,26 +303,23 @@ MainScene::MainScene()
     , _musicId(-1)
     , _sprPlayer(nullptr)
     , _director(nullptr)
-    , _sceneID(0)
     , _touchListener(nullptr)
     , _keyboardListener(nullptr)
     , _mouseListener(nullptr)
     , _muteItem(nullptr)
     , _unmuteItem(nullptr)
 {
-    _sceneID = ++s_sceneID;
 }
 
 MainScene::~MainScene()
 {
-
+    AXLOGD("Freeing MainScene resources.");
     if (_touchListener)
         _eventDispatcher->removeEventListener(_touchListener);
     if (_keyboardListener)
         _eventDispatcher->removeEventListener(_keyboardListener);
     if (_mouseListener)
         _eventDispatcher->removeEventListener(_mouseListener);
-    _sceneID = -1;
 
     // Cleanup bomb user data
     for (auto bomb : _bombs)

@@ -46,7 +46,6 @@ private:
     ax::EventListenerTouchAllAtOnce* _touchListener;
     ax::EventListenerKeyboard* _keyboardListener;
     ax::EventListenerMouse* _mouseListener;
-    int _sceneID;
     ax::Director* _director;
 
 	ax::Size _visibleSize;
