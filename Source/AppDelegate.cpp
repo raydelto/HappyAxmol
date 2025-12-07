@@ -1,28 +1,3 @@
-/****************************************************************************
- Copyright (c) 2017-2018 Xiamen Yaji Software Co., Ltd.
- Copyright (c) 2019-present Axmol Engine contributors (see AUTHORS.md).
-
- https://axmol.dev/
-
- Permission is hereby granted, free of charge, to any person obtaining a copy
- of this software and associated documentation files (the "Software"), to deal
- in the Software without restriction, including without limitation the rights
- to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
- copies of the Software, and to permit persons to whom the Software is
- furnished to do so, subject to the following conditions:
-
- The above copyright notice and this permission notice shall be included in
- all copies or substantial portions of the Software.
-
- THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
- IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
- FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
- AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
- LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
- OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
- THE SOFTWARE.
- ****************************************************************************/
-
 #include "AppDelegate.h"
 #include "MainScene.h"
 
@@ -37,21 +12,17 @@
 #    include "axmol/vr/VRGenericRenderer.h"
 #endif
 
-using namespace ax;
 
 static ax::Size designResolutionSize = ax::Size(768, 1280);
 
-AppDelegate::AppDelegate() {}
-
-AppDelegate::~AppDelegate() {}
 
 // if you want a different context, modify the value of contextAttrs
 // it will affect all platforms
 void AppDelegate::initContextAttrs()
 {
-    // set app context attributes: red,green,blue,alpha,depth,stencil,multisamplesCount
+    // Set app context attributes: red,green,blue,alpha,depth,stencil,multisamplesCount
     // powerPreference only affect when RHI backend is D3D
-    ContextAttrs contextAttrs = {.powerPreference = PowerPreference::HighPerformance};
+    ax::ContextAttrs contextAttrs = {.powerPreference = ax::PowerPreference::HighPerformance};
 
     // V-Sync is enabled by default since axmol 2.2.
     // Uncomment to disable V-Sync and unlock FPS.
@@ -60,7 +31,7 @@ void AppDelegate::initContextAttrs()
     // Enable high-DPI scaling support (non-Windows platforms only)
     // Note: cpp-tests keep the default render mode to ensure consistent performance benchmarks
 #if AX_TARGET_PLATFORM != AX_PLATFORM_WIN32
-    contextAttrs.renderScaleMode = RenderScaleMode::Physical;
+    contextAttrs.renderScaleMode = ax::RenderScaleMode::Physical;
 #endif
     setContextAttrs(contextAttrs);
 }
@@ -68,16 +39,17 @@ void AppDelegate::initContextAttrs()
 bool AppDelegate::applicationDidFinishLaunching()
 {
     // initialize director
-    auto director   = Director::getInstance();
+    auto director   = ax::Director::getInstance();
     auto renderView = director->getRenderView();
     if (!renderView)
     {
+        constexpr const char* TITLE = "Happy Bunny";
 #if (AX_TARGET_PLATFORM == AX_PLATFORM_WIN32) || (AX_TARGET_PLATFORM == AX_PLATFORM_MAC) || \
     (AX_TARGET_PLATFORM == AX_PLATFORM_LINUX)
-        renderView = RenderViewImpl::createWithRect(
-            "HappyBunny", ax::Rect(0, 0, designResolutionSize.width, designResolutionSize.height));
+        renderView = ax::RenderViewImpl::createWithRect(
+            TITLE, ax::Rect(0, 0, designResolutionSize.width, designResolutionSize.height));
 #else
-        renderView = RenderViewImpl::create("HappyBunny");
+        renderView = RenderViewImpl::create(TITLE);
 #endif
         director->setRenderView(renderView);
     }
@@ -90,8 +62,8 @@ bool AppDelegate::applicationDidFinishLaunching()
 #endif
 
     auto glview     = director->getRenderView();
-    Size screenSize = glview->getFrameSize();
-    Size designSize(768, 1280);
+    ax::Size screenSize = glview->getFrameSize();
+    ax::Size designSize(768, 1280);
     std::vector<std::string> searchPaths;
     searchPaths.push_back("sounds");
     searchPaths.push_back("particles");
@@ -114,8 +86,8 @@ bool AppDelegate::applicationDidFinishLaunching()
         searchPaths.push_back("images/low");
         director->setContentScaleFactor(320.0f / designSize.height);
     }
-    FileUtils::getInstance()->setSearchPaths(searchPaths);
-    glview->setDesignResolutionSize(designSize.width, designSize.height, ResolutionPolicy::EXACT_FIT);
+    ax::FileUtils::getInstance()->setSearchPaths(searchPaths);
+    glview->setDesignResolutionSize(designSize.width, designSize.height, ax::ResolutionPolicy::SHOW_ALL);
 
     // turn on display FPS
     director->setStatsDisplay(true);
@@ -125,7 +97,7 @@ bool AppDelegate::applicationDidFinishLaunching()
 
     // Set the design resolution
     renderView->setDesignResolutionSize(designResolutionSize.width, designResolutionSize.height,
-                                        ResolutionPolicy::SHOW_ALL);
+                                        ax::ResolutionPolicy::SHOW_ALL);
 
     // create a scene. it's an autorelease object
     auto scene = MainScene::createScene();
@@ -139,20 +111,20 @@ bool AppDelegate::applicationDidFinishLaunching()
 // This function will be called when the app is inactive. Note, when receiving a phone call it is invoked.
 void AppDelegate::applicationDidEnterBackground()
 {
-    Director::getInstance()->stopAnimation();
+    ax::Director::getInstance()->stopAnimation();
 
 #if USE_AUDIO_ENGINE
-    AudioEngine::pauseAll();
+    ax::AudioEngine::pauseAll();
 #endif
 }
 
 // this function will be called when the app is active again
 void AppDelegate::applicationWillEnterForeground()
 {
-    Director::getInstance()->startAnimation();
+    ax::Director::getInstance()->startAnimation();
 
 #if USE_AUDIO_ENGINE
-    AudioEngine::resumeAll();
+    ax::AudioEngine::resumeAll();
 #endif
 }
 
