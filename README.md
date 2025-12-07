@@ -1,6 +1,10 @@
 # HappyAxmol
 
-A cross-platform game built with [Axmol Engine](https://axmol.dev/).
+HappyAxmol is the Axmol port of the Cocos2d-x Happy Bunny Game.
+
+This is a cross-platform game built with [Axmol Engine](https://axmol.dev/).
+
+You can run the web build from [here](https://www.raydelto.org/axmol).
 
 ![HappyAxmol Screenshot](./ScreenShot/HappyAxmol_Screenshot.png)
 
@@ -14,10 +18,10 @@ Before building this project, you need to have the following installed:
 
 ### Setting up Axmol Engine
 
-1. Clone or download the Axmol Engine
-2. Set the `AX_ROOT` environment variable to point to your Axmol installation:
-   - **Windows**: `setx AX_ROOT "C:\path\to\axmol"`
-   - **Linux/macOS**: Add `export AX_ROOT=/path/to/axmol` to your shell profile
+1. Clone or download the Axmol Engine (https://www.axmol.dev)
+2. Run the Axmol setup script contained in the root of the axmol repo.
+   - **Windows**: `setup.ps1`
+   - **Linux/macOS**: `setup.py`
 
 Alternatively, you can place the `axmol` folder directly in this project directory for an isolated build.
 
@@ -153,8 +157,7 @@ cmake --build build_wasm
 
 Start a local web server in the build output directory:
 ```bash
-cd build_wasm/bin/HappyAxmol
-python3 -m http.server 8080
+axmol run -p wasm
 ```
 
 Then open your browser and navigate to: `http://localhost:8080`
@@ -193,7 +196,3 @@ Ensure you've activated the Emscripten environment in your current terminal sess
 - [Axmol Engine Documentation](https://axmol.dev/)
 - [Axmol GitHub Repository](https://github.com/axmolengine/axmol)
 - [CMake Documentation](https://cmake.org/documentation/)
-
-## License
-
-See the license header in source files for licensing information.
