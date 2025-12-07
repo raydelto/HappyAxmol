@@ -49,7 +49,7 @@ bool AppDelegate::applicationDidFinishLaunching()
         renderView = ax::RenderViewImpl::createWithRect(
             TITLE, ax::Rect(0, 0, designResolutionSize.width, designResolutionSize.height));
 #else
-        renderView = RenderViewImpl::create(TITLE);
+        renderView = ax::RenderViewImpl::create(TITLE);
 #endif
         director->setRenderView(renderView);
     }
