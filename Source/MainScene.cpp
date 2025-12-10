@@ -184,7 +184,7 @@ void MainScene::addBombs(float dt)
     {
         auto bomb    = ax::Sprite::create("bomb.png");
         float* speed = new float;
-        *speed       = ax::random(6.0f, 10.5f);
+        *speed       = ax::random(90.0f, 180.0f);
         bomb->setUserData(static_cast<void*>(speed));
         bomb->setPosition(AXRANDOM_0_1() * _visibleSize.width, _visibleSize.height + bomb->getContentSize().height / 2);
         this->addChild(bomb, 1);
@@ -275,7 +275,7 @@ void MainScene::update(float delta)
 
         for (auto bomb : _bombs)
         {
-            bomb->setPositionY(bomb->getPositionY() - (static_cast<float*>(bomb->getUserData())[0]));
+            bomb->setPositionY(bomb->getPositionY() - (static_cast<float*>(bomb->getUserData())[0]) * delta);
             if (bomb->getBoundingBox().intersectsRect(_sprPlayer->getBoundingBox()))
             {
                 onCollision();
